@@ -3,19 +3,18 @@ import os
 import json
 import time
 import logging
-
+import threading
+from queue import Queue, Empty
 import numpy as np
 import cv2
 import tensorflow as tf
 from pythonosc import udp_client
-
 from mjpeg_streamer import MJPEGVideoCapture
 
 # ----------------------------
 # Normalization & OSC Helpers
 # ----------------------------
 class Norm:
-    # Copy these exact values from your TS NormalizationUtils
     maxPosTheta1 = 30.0
     maxNegTheta1 = -25.0
     maxAbsTheta2  = 30.0
@@ -36,17 +35,11 @@ def calculate_offset_fraction(pitch_offset: float) -> float:
     return (2 * pitch_offset) / span
 
 def normalize_theta1(v: float) -> float:
-    if v >= 0:
-        return v / Norm.maxPosTheta1
-    else:
-        return v / abs(Norm.maxNegTheta1)
+    return v / Norm.maxPosTheta1 if v >= 0 else v / abs(Norm.maxNegTheta1)
 
 def normalize_theta2(v: float) -> float:
     return v / Norm.maxAbsTheta2
 
-# ----------------------------
-# Openness Transform
-# ----------------------------
 def transform_openness(val: float, cfg: list) -> float:
     h0, h1, h2, h3 = cfg
     if val < h0:
@@ -61,44 +54,239 @@ def transform_openness(val: float, cfg: list) -> float:
         return 1.0
 
 # ----------------------------
-# Image Preprocessing & Config
+# Config Loader Task
 # ----------------------------
-def load_and_preprocess(frame: np.ndarray, size=(128,128)) -> tf.Tensor:
-    img = cv2.resize(frame, size)
-    return tf.convert_to_tensor(img, dtype=tf.float32) / 255.0
+class ConfigTask(threading.Thread):
+    def __init__(self, path, shared, lock, interval=0.5):
+        super().__init__(daemon=True)
+        self.path = path
+        self.shared = shared
+        self.lock = lock
+        self.interval = interval
+        self._last_mtime = 0
 
-def load_config(path="./Settings.json"):
-    with open(path, "r") as f:
-        return json.load(f)
+    def run(self):
+        while True:
+            try:
+                mtime = os.path.getmtime(self.path)
+                if mtime != self._last_mtime:
+                    with open(self.path, 'r') as f:
+                        cfg = json.load(f)
+                    with self.lock:
+                        self.shared.clear()
+                        self.shared.update(cfg)
+                    self._last_mtime = mtime
+                    logging.info("Config reloaded.")
+            except FileNotFoundError:
+                logging.warning("Settings.json not found.")
+            time.sleep(self.interval)
 
 # ----------------------------
-# Main Loop
+# Frame Capture Task
 # ----------------------------
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S"
-    )
-    cfg = load_config()
+class CaptureTask(threading.Thread):
+    def __init__(self, capL, capR, queueL, queueR):
+        super().__init__(daemon=True)
+        self.capL, self.capR = capL, capR
+        self.queueL, self.queueR = queueL, queueR
 
-    # OSC client
-    osc_host, osc_port = cfg["vrcOsc"].split(":")
-    osc = udp_client.SimpleUDPClient(osc_host, int(osc_port))
-    prev_osc = cfg["vrcOsc"]
+    def run(self):
+        while True:
+            okL, fL = self.capL.read()
+            okR, fR = self.capR.read()
+            if okL:
+                if self.queueL.full(): self.queueL.get_nowait()
+                self.queueL.put(fL)
+            if okR:
+                if self.queueR.full(): self.queueR.get_nowait()
+                self.queueR.put(fR)
+            time.sleep(0.001)
 
-    # MJPEG streams
-    capL = MJPEGVideoCapture(f"http://{cfg['leftEye']}")
-    capR = MJPEGVideoCapture(f"http://{cfg['rightEye']}")
-    capL.open(); capR.open()
-    while not capL.isPrimed() or not capR.isPrimed():
-        logging.info("Waiting for initial frames…")
-        time.sleep(0.1)
+# ----------------------------
+# Inference Task
+# ----------------------------
+class InferenceTask(threading.Thread):
+    def __init__(self, models, queueL, queueR, result_queue, shared, lock):
+        super().__init__(daemon=True)
+        self.models = models
+        self.queueL, self.queueR = queueL, queueR
+        self.result_queue = result_queue
+        self.shared = shared
+        self.lock = lock
 
-    # Load models
-    model_dir = cfg["modelFile"]
-    logging.info(f"Loading models from {model_dir}…")
-    models = {
+    def preprocess(self, frame):
+        img = cv2.resize(frame, (128,128))
+        return tf.convert_to_tensor(img, dtype=tf.float32) / 255.0
+
+    def run(self):
+        while True:
+            try:
+                fL = self.queueL.get(timeout=1)
+                fR = self.queueR.get(timeout=1)
+            except Empty:
+                continue
+
+            lt = tf.expand_dims(self.preprocess(fL), 0)
+            rt = tf.expand_dims(self.preprocess(fR), 0)
+
+            with self.lock:
+                cfg = dict(self.shared)
+            outputs = {}
+
+            # openness
+            if cfg.get("activeOpennessTracking", False):
+                handles = cfg["opennessSliderHandles"]
+                if not cfg.get("independentOpenness", False):
+                    raw = self.models["combined_open"].predict([lt, rt])[0,0]
+                    o = transform_openness(raw, handles)
+                    outputs['oL'] = outputs['oR'] = o
+                else:
+                    outputs['oL'] = transform_openness(self.models["left_open"].predict(lt)[0,0], handles)
+                    outputs['oR'] = transform_openness(self.models["right_open"].predict(rt)[0,0], handles)
+
+            # pitch/yaw
+            if cfg.get("activeEyeTracking", False):
+                off_frac = calculate_offset_fraction(cfg["pitchOffset"])
+                hor, ver = cfg["horizontalExaggeration"], cfg["verticalExaggeration"]
+                if not cfg.get("independentEyes", False):
+                    m = self.models["combined_theta"]
+                    inp = [lt, rt]
+                    if len(m.inputs) == 3:
+                        inp.append(tf.convert_to_tensor([[0.75]], dtype=tf.float32))
+                    raw_p, raw_y = m.predict(inp)[0]
+                    n1, n2 = normalize_theta1(raw_p), normalize_theta2(raw_y)
+                    outputs['t_comb'] = (
+                        scale_offset_and_clamp(n1, off_frac, ver),
+                        scale_and_clamp(n2, hor)
+                    )
+                else:
+                    pL, yL = self.models["left_theta"].predict(lt)[0]
+                    pR, yR = self.models["right_theta"].predict(rt)[0]
+                    n1L, n2L = normalize_theta1(pL), normalize_theta2(yL)
+                    n1R, n2R = normalize_theta1(pR), normalize_theta2(yR)
+                    outputs['tL'] = (scale_offset_and_clamp(n1L, off_frac, ver), scale_and_clamp(n2L, hor))
+                    outputs['tR'] = (scale_offset_and_clamp(n1R, off_frac, ver), scale_and_clamp(n2R, hor))
+
+            self.result_queue.put(outputs)
+            with self.lock:
+                rate = self.shared.get("trackingRate", 50) / 1000.0
+            time.sleep(rate)
+
+# ----------------------------
+# Post-Process & OSC Sender Task
+# ----------------------------
+class OSCSenderTask(threading.Thread):
+    def __init__(self, result_queue, shared, lock):
+        super().__init__(daemon=True)
+        self.queue = result_queue
+        self.shared = shared
+        self.lock = lock
+        self.prev = {}
+        self.blink_ts = {"left":0, "right":0, "combined":0}
+
+    def run(self):
+        osc = None
+        while True:
+            data = self.queue.get()
+            with self.lock:
+                cfg = dict(self.shared)
+            # OSC client update
+            if osc is None or cfg["vrcOsc"] != f"{osc._address}:{osc._port}":
+                host, port = cfg["vrcOsc"].split(":")
+                osc = udp_client.SimpleUDPClient(host, int(port))
+                logging.info("OSC endpoint set to %s:%s", host, port)
+
+            # blink-release logic
+            now = time.time()
+            for eye in ["left","right"]:
+                o = data.get("o"+eye[0].upper())
+                if o == 0:
+                    self.blink_ts[eye] = now
+                elif now <= self.blink_ts[eye] + cfg["blinkReleaseDelayMs"]/1000.0:
+                    data["o"+eye[0].upper()] = 0
+
+            if "oL" in data and not cfg.get("independentOpenness",False):
+                cb = data["oL"]
+                if cb == 0:
+                    self.blink_ts["combined"] = now
+                elif now <= self.blink_ts["combined"] + cfg["blinkReleaseDelayMs"]/1000.0:
+                    data["oL"] = data["oR"] = 0
+
+            # determine mode and send
+            mode = ("none" if cfg["trackingForcedOffline"]
+                    else "native" if cfg["vrcNative"]
+                    else "v1"    if cfg["vrcftV1"]
+                    else "v2"    if cfg["vrcftV2"]
+                    else "none")
+
+            def send(key, *vals):
+                if self.prev.get(key) != tuple(vals):
+                    self.prev[key] = tuple(vals)
+                    osc.send_message(key, list(vals))
+
+            # NATIVE
+            if mode == "native":
+                if "t_comb" in data and not cfg.get("independentEyes",False):
+                    send("/avatar/eye/native/combined", *data["t_comb"])
+                elif "tL" in data and cfg.get("independentEyes",False):
+                    yL,xL = data["tL"]; yR,xR = data["tR"]
+                    send("/avatar/eye/native/independent", yL, xL, yR, xR)
+                if "oL" in data:
+                    send("/avatar/eye/native/openness", data["oL"])
+
+            # V1
+            elif mode == "v1":
+                if "t_comb" in data and not cfg.get("independentEyes",False):
+                    y,x = data["t_comb"]
+                    send("/avatar/parameters/LeftEyeX", x)
+                    send("/avatar/parameters/RightEyeX", x)
+                    send("/avatar/parameters/EyesY",    -y)
+                elif "tL" in data and cfg.get("independentEyes",False):
+                    yL,xL = data["tL"]; yR,xR = data["tR"]
+                    send("/avatar/parameters/LeftEyeX", xL)
+                    send("/avatar/parameters/RightEyeX", xR)
+                    send("/avatar/parameters/EyesY",    -yL)
+                if "oL" in data:
+                    if cfg.get("independentOpenness",False):
+                        send("/avatar/parameters/LeftEyeLid",  data["oL"])
+                        send("/avatar/parameters/RightEyeLid", data["oR"])
+                    else:
+                        send("/avatar/parameters/CombinedEyeLid", data["oL"])
+
+            # V2
+            elif mode == "v2":
+                pfx = cfg["oscPrefix"].strip("/")
+                base = f"/avatar/parameters/{pfx}/v2/" if pfx else "/avatar/parameters/v2/"
+                splitY = cfg.get("splitOutputY", False)
+                if "t_comb" in data and not cfg.get("independentEyes",False):
+                    y,x = data["t_comb"]
+                    if splitY:
+                        send(base+"EyeLeftX",  x); send(base+"EyeLeftY",  -y)
+                        send(base+"EyeRightX", x); send(base+"EyeRightY", -y)
+                    else:
+                        send(base+"EyeLeftX",  x); send(base+"EyeRightX", x)
+                        send(base+"EyeY",      -y)
+                elif "tL" in data and cfg.get("independentEyes",False):
+                    yL,xL = data["tL"]; yR,xR = data["tR"]
+                    if splitY:
+                        send(base+"EyeLeftX",  xL); send(base+"EyeLeftY",  -yL)
+                        send(base+"EyeRightX", xR); send(base+"EyeRightY", -yR)
+                    else:
+                        send(base+"EyeLeftX",  xL); send(base+"EyeRightX", xR)
+                        send(base+"EyeY",      -yL)
+                if "oL" in data:
+                    if cfg.get("independentOpenness",False):
+                        send(base+"EyeLidLeft",  data["oL"])
+                        send(base+"EyeLidRight", data["oR"])
+                    else:
+                        send(base+"EyeLidLeft",  data["oL"])
+                        send(base+"EyeLidRight", data["oL"])
+
+# ----------------------------
+# Main
+# ----------------------------
+def load_models(model_dir):
+    return {
         "combined_theta": tf.keras.models.load_model(os.path.join(model_dir, "combined_pitchyaw.h5"), compile=False),
         "combined_open" : tf.keras.models.load_model(os.path.join(model_dir, "combined_openness.h5"), compile=False),
         "left_theta"    : tf.keras.models.load_model(os.path.join(model_dir, "left_pitchyaw.h5"), compile=False),
@@ -106,247 +294,46 @@ def main():
         "right_theta"   : tf.keras.models.load_model(os.path.join(model_dir, "right_pitchyaw.h5"), compile=False),
         "right_open"    : tf.keras.models.load_model(os.path.join(model_dir, "right_openness.h5"), compile=False),
     }
-    logging.info("Models ready.")
 
-    # State & blink timestamps
-    prev_vals = {
-        "native_combined_theta": None,
-        "native_indep_theta":    None,
-        "native_open":          None,
-        "v1_combined_theta":    None,
-        "v1_indep_theta":       None,
-        "v1_open_comb":         None,
-        "v1_open_indep":        None,
-        "v2_combined_theta":    None,
-        "v2_indep_theta":       None,
-        "v2_open_comb":         None,
-        "v2_open_indep":        None,
-    }
-    blink_ts = {"combined":0, "left":0, "right":0}
-    prev_ts  = {"left":0, "right":0}
-    rate_ms  = cfg["trackingRate"]
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S")
+    shared_cfg = {}
+    cfg_lock = threading.Lock()
 
-    logging.info("Starting main loop. Ctrl+C to stop.")
+    # start config watcher
+    ConfigTask("./Settings.json", shared_cfg, cfg_lock).start()
+    # wait for initial config
+    while True:
+        with cfg_lock:
+            if shared_cfg:
+                break
+        time.sleep(0.1)
+
+    # setup camera and models once
+    with cfg_lock:
+        cfg = dict(shared_cfg)
+    capL = MJPEGVideoCapture(f"http://{cfg['leftEye']}"); capL.open()
+    capR = MJPEGVideoCapture(f"http://{cfg['rightEye']}"); capR.open()
+    while not capL.isPrimed() or not capR.isPrimed():
+        logging.info("Waiting for cameras…"); time.sleep(0.1)
+    models = load_models(cfg["modelFile"])
+    logging.info("Models loaded and cameras ready.")
+
+    # queues
+    qL, qR = Queue(maxsize=1), Queue(maxsize=1)
+    results = Queue(maxsize=5)
+
+    # start tasks
+    CaptureTask(capL, capR, qL, qR).start()
+    InferenceTask(models, qL, qR, results, shared_cfg, cfg_lock).start()
+    OSCSenderTask(results, shared_cfg, cfg_lock).start()
+
+    # keep main alive
     try:
         while True:
-            now_ms = int(time.time() * 1000)
-
-            # reload config if changed
-            new_cfg = load_config()
-            if new_cfg["vrcOsc"] != prev_osc:
-                osc_host, osc_port = new_cfg["vrcOsc"].split(":")
-                osc = udp_client.SimpleUDPClient(osc_host, int(osc_port))
-                prev_osc = new_cfg["vrcOsc"]
-                logging.info("OSC endpoint updated → %s", prev_osc)
-            cfg = new_cfg
-
-            okL, fL = capL.read()
-            okR, fR = capR.read()
-
-            # frame timing
-            proceed = False
-            if cfg["syncedEyeUpdates"] and okL and okR:
-                if now_ms - prev_ts["left"] >= rate_ms and now_ms - prev_ts["right"] >= rate_ms:
-                    proceed = True
-                    prev_ts["left"] = prev_ts["right"] = now_ms
-            else:
-                if okL and now_ms - prev_ts["left"] >= rate_ms:
-                    proceed = True
-                    prev_ts["left"] = now_ms
-                if okR and now_ms - prev_ts["right"] >= rate_ms:
-                    proceed = True
-                    prev_ts["right"] = now_ms
-
-            if not proceed:
-                time.sleep(0.001)
-                continue
-
-            # preprocess
-            lt = load_and_preprocess(fL) if okL else tf.zeros((128,128,3))
-            rt = load_and_preprocess(fR) if okR else tf.zeros((128,128,3))
-            lt_b, rt_b = tf.expand_dims(lt,0), tf.expand_dims(rt,0)
-
-            # openness
-            if cfg["activeOpennessTracking"]:
-                if not cfg["independentOpenness"] and okL and okR:
-                    raw = models["combined_open"].predict([lt_b, rt_b])[0,0]
-                    oL = oR = transform_openness(raw, cfg["opennessSliderHandles"])
-                else:
-                    oL = transform_openness(models["left_open"].predict(lt_b)[0,0], cfg["opennessSliderHandles"]) if okL else None
-                    oR = transform_openness(models["right_open"].predict(rt_b)[0,0], cfg["opennessSliderHandles"]) if okR else None
-            else:
-                oL = oR = None
-
-            # blink‐release delay
-            br_s = cfg["blinkReleaseDelayMs"] / 1000.0
-            t_now = time.time()
-            if oL == 0:    blink_ts["left"] = t_now
-            elif t_now <= blink_ts["left"] + br_s:   oL = 0
-            if oR == 0:    blink_ts["right"] = t_now
-            elif t_now <= blink_ts["right"] + br_s:  oR = 0
-            if oL is not None and oR is not None and not cfg["independentOpenness"]:
-                if oL == 0:    blink_ts["combined"] = t_now
-                elif t_now <= blink_ts["combined"] + br_s:
-                    oL = oR = 0
-
-            # gaze‐trust (fallback)
-            trust_comb = trust_L = trust_R = 0.75
-            if okL and okR and not cfg["independentOpenness"]:
-                trust_comb = oL
-            else:
-                if okL: trust_L = oL
-                if okR: trust_R = oR
-            if not cfg["eyelidBasedGazeTrust"]:
-                trust_comb = trust_L = trust_R = 0.75
-
-            # compute theta with normalization, offset & clamping
-            t_comb = tL = tR = None
-            if cfg["activeEyeTracking"]:
-                off_frac = calculate_offset_fraction(cfg["pitchOffset"])
-                # combined
-                if not cfg["independentEyes"] and okL and okR:
-                    m = models["combined_theta"]
-                    inputs = [lt_b, rt_b]
-                    if len(m.inputs) == 3:
-                        inputs.append(tf.convert_to_tensor([[trust_comb]], dtype=tf.float32))
-                    out = m.predict(inputs)[0]
-                    raw_p, raw_y = float(out[0]), float(out[1])
-                    n1 = normalize_theta1(raw_p)
-                    n2 = normalize_theta2(raw_y)
-                    y = scale_offset_and_clamp(n1, off_frac, cfg["verticalExaggeration"])
-                    x = scale_and_clamp(n2, cfg["horizontalExaggeration"])
-                    t_comb = (y, x)
-                else:
-                    # independent
-                    if okL:
-                        outL = models["left_theta"].predict(lt_b)[0]
-                        rp, ry = float(outL[0]), float(outL[1])
-                        n1, n2 = normalize_theta1(rp), normalize_theta2(ry)
-                        yL = scale_offset_and_clamp(n1, off_frac, cfg["verticalExaggeration"])
-                        xL = scale_and_clamp(n2, cfg["horizontalExaggeration"])
-                        tL = (yL, xL)
-                    if okR:
-                        outR = models["right_theta"].predict(rt_b)[0]
-                        rp, ry = float(outR[0]), float(outR[1])
-                        n1, n2 = normalize_theta1(rp), normalize_theta2(ry)
-                        yR = scale_offset_and_clamp(n1, off_frac, cfg["verticalExaggeration"])
-                        xR = scale_and_clamp(n2, cfg["horizontalExaggeration"])
-                        tR = (yR, xR)
-
-            # determine mode
-            mode = (
-                "none" if cfg["trackingForcedOffline"]
-                else "native" if cfg["vrcNative"]
-                else "v1"    if cfg["vrcftV1"]
-                else "v2"    if cfg["vrcftV2"]
-                else "none"
-            )
-
-            def changed(key, val):
-                if prev_vals[key] != val:
-                    prev_vals[key] = val
-                    return True
-                return False
-
-            # ---- NATIVE MODE ----
-            if mode == "native":
-                # pitch/yaw
-                if cfg["activeEyeTracking"]:
-                    if cfg["independentEyes"]:
-                        if tL and tR and changed("native_indep_theta", (tL, tR)):
-                            osc.send_message(
-                                "/avatar/eye/native/independent",
-                                [tL[0], tL[1], tR[0], tR[1]]
-                            )
-                    else:
-                        if t_comb and changed("native_combined_theta", t_comb):
-                            osc.send_message(
-                                "/avatar/eye/native/combined",
-                                [t_comb[0], t_comb[1]]
-                            )
-                # openness (always combined)
-                if cfg["activeOpennessTracking"] and oL is not None:
-                    if changed("native_open", oL):
-                        osc.send_message(
-                            "/avatar/eye/native/openness",
-                            [oL]
-                        )
-
-            # ---- VRCFT V1 MODE ----
-            elif mode == "v1":
-                # pitch/yaw
-                if cfg["activeEyeTracking"]:
-                    if cfg["independentEyes"]:
-                        if tL and tR and changed("v1_indep_theta", (tL, tR)):
-                            osc.send_message("/avatar/parameters/LeftEyeX",  [tL[1]])
-                            osc.send_message("/avatar/parameters/RightEyeX", [tR[1]])
-                            osc.send_message("/avatar/parameters/EyesY",    [-tL[0]])
-                    else:
-                        if t_comb and changed("v1_combined_theta", t_comb):
-                            osc.send_message("/avatar/parameters/LeftEyeX",  [t_comb[1]])
-                            osc.send_message("/avatar/parameters/RightEyeX", [t_comb[1]])
-                            osc.send_message("/avatar/parameters/EyesY",    [-t_comb[0]])
-                # openness
-                if cfg["activeOpennessTracking"]:
-                    if cfg["independentOpenness"]:
-                        if oL is not None and oR is not None and changed("v1_open_indep", (oL, oR)):
-                            osc.send_message("/avatar/parameters/LeftEyeLid",  [oL])
-                            osc.send_message("/avatar/parameters/RightEyeLid", [oR])
-                    else:
-                        if oL is not None and changed("v1_open_comb", oL):
-                            osc.send_message("/avatar/parameters/CombinedEyeLid", [oL])
-
-            # ---- VRCFT V2 MODE ----
-            elif mode == "v2":
-                # build prefix
-                raw_pfx = cfg["oscPrefix"].strip("/")
-                base = f"/avatar/parameters/{raw_pfx}/v2/" if raw_pfx else "/avatar/parameters/v2/"
-
-                # pitch/yaw
-                if cfg["activeEyeTracking"]:
-                    if cfg["independentEyes"]:
-                        if tL and tR and changed("v2_indep_theta", (tL, tR)):
-                            ly, lx = tL; ry, rx = tR
-                            if cfg["splitOutputY"]:
-                                osc.send_message(base + "EyeLeftX",  [lx])
-                                osc.send_message(base + "EyeLeftY",  [-ly])
-                                osc.send_message(base + "EyeRightX", [rx])
-                                osc.send_message(base + "EyeRightY", [-ry])
-                            else:
-                                osc.send_message(base + "EyeLeftX",  [lx])
-                                osc.send_message(base + "EyeRightX", [rx])
-                                osc.send_message(base + "EyeY",      [-ly])
-                    else:
-                        if t_comb and changed("v2_combined_theta", t_comb):
-                            y, x = t_comb
-                            if cfg["splitOutputY"]:
-                                osc.send_message(base + "EyeLeftX",  [x])
-                                osc.send_message(base + "EyeLeftY",  [-y])
-                                osc.send_message(base + "EyeRightX", [x])
-                                osc.send_message(base + "EyeRightY", [-y])
-                            else:
-                                osc.send_message(base + "EyeLeftX",  [x])
-                                osc.send_message(base + "EyeRightX", [x])
-                                osc.send_message(base + "EyeY",      [-y])
-
-                # openness
-                if cfg["activeOpennessTracking"]:
-                    if cfg["independentOpenness"]:
-                        if oL is not None and oR is not None and changed("v2_open_indep", (oL, oR)):
-                            osc.send_message(base + "EyeLidLeft",  [oL])
-                            osc.send_message(base + "EyeLidRight", [oR])
-                    else:
-                        if oL is not None and changed("v2_open_comb", oL):
-                            osc.send_message(base + "EyeLidLeft",  [oL])
-                            osc.send_message(base + "EyeLidRight", [oL])
-
-            time.sleep(0.001)
-
+            time.sleep(1)
     except KeyboardInterrupt:
-        logging.info("Stopping…")
-    finally:
-        capL.release(); capR.release()
-        logging.info("All streams closed.")
+        logging.info("Shutting down…")
 
 if __name__ == "__main__":
     main()
