@@ -103,6 +103,9 @@ class InferenceTask(threading.Thread):
         return img.astype(np.float32) / 255.0
 
     def run(self):
+        infer_count = 0
+        start_time = time.perf_counter()
+        
         while True:
             try:
                 fL = self.queueL.get(timeout=1)
@@ -171,7 +174,17 @@ class InferenceTask(threading.Thread):
                         )
 
             self.result_queue.put(outputs)
+            infer_count += 1
+
+            # every second, log the rate and reset
+            now = time.perf_counter()
+            elapsed = now - start_time
+            if elapsed >= 1.0:
+                rate = infer_count / elapsed
+                logging.info(f"Inference rate: {rate:.2f} updates/s")
+                infer_count = 0
+                start_time = now
 
             with self.lock:
-                rate = self.shared.get("trackingRate", 50) / 1000.0
-            time.sleep(rate)
+                interval = self.shared.get("trackingRate", 50) / 1000.0
+            time.sleep(interval)
