@@ -1,4 +1,4 @@
-name: etvr
+name: et
 channels:
   - conda-forge
   - defaults
