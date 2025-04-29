@@ -22,6 +22,20 @@ from helpers import (
     scale_and_clamp,
 )
 
+
+import onnxruntime as ort
+
+def get_onnx_providers():
+    """
+    Return a list of ONNX Runtime providers, preferring GPU if available.
+    """
+    available = ort.get_available_providers()
+    if "CUDAExecutionProvider" in available:
+        # You may also configure session options here (e.g. memory limits).
+        return ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    else:
+        return ["CPUExecutionProvider"]
+    
 # --------------------------------
 # ONNX conversion helper
 # --------------------------------
@@ -75,13 +89,18 @@ def load_models(model_dir):
         "right_open"    : "right_openness.h5",
     }
     sessions = {}
+    providers = get_onnx_providers()
+
     for key, fname in specs.items():
-        h5_path = os.path.join(model_dir, fname)
+        h5_path   = os.path.join(model_dir, fname)
         onnx_path = os.path.splitext(h5_path)[0] + ".onnx"
         ensure_onnx(h5_path, onnx_path)
 
-        # load ONNX session
-        sess = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
+        # Create the session with GPU if available
+        sess = ort.InferenceSession(
+            onnx_path,
+            providers=providers
+        )
         sessions[key] = sess
 
     return sessions
