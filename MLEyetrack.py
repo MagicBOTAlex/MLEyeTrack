@@ -314,8 +314,13 @@ def main():
         cfg = dict(shared_cfg)
     capL = MJPEGVideoCapture(f"http://{cfg['leftEye']}"); capL.open()
     capR = MJPEGVideoCapture(f"http://{cfg['rightEye']}"); capR.open()
-    while not capL.isPrimed() or not capR.isPrimed():
-        logging.info("Waiting for cameras…"); time.sleep(0.1)
+    logging.info("Waiting for at least one camera to become ready…")
+    while not (capL.isPrimed() or capR.isPrimed()):
+        time.sleep(0.1)
+    logging.info(
+        "Camera ready. leftPrimed=%s, rightPrimed=%s",
+        capL.isPrimed(), capR.isPrimed()
+    )
     models = load_models(cfg["modelFile"])
     logging.info("Models loaded and cameras ready.")
 
