@@ -14,10 +14,20 @@ from helpers import *
 # ----------------------------
 # Inference Task
 # ----------------------------
+def load_models(model_dir):
+    return {
+        "combined_theta": tf.keras.models.load_model(os.path.join(model_dir, "combined_pitchyaw.h5"), compile=False),
+        "combined_open" : tf.keras.models.load_model(os.path.join(model_dir, "combined_openness.h5"), compile=False),
+        "left_theta"    : tf.keras.models.load_model(os.path.join(model_dir, "left_pitchyaw.h5"), compile=False),
+        "left_open"     : tf.keras.models.load_model(os.path.join(model_dir, "left_openness.h5"), compile=False),
+        "right_theta"   : tf.keras.models.load_model(os.path.join(model_dir, "right_pitchyaw.h5"), compile=False),
+        "right_open"    : tf.keras.models.load_model(os.path.join(model_dir, "right_openness.h5"), compile=False),
+    }
+
 class InferenceTask(threading.Thread):
-    def __init__(self, models, queueL, queueR, result_queue, shared, lock):
+    def __init__(self, cfg, queueL, queueR, result_queue, shared, lock):
         super().__init__(daemon=True)
-        self.models = models
+        self.models = load_models(cfg["modelFile"])
         self.queueL, self.queueR = queueL, queueR
         self.result_queue = result_queue
         self.shared = shared

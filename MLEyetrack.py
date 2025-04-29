@@ -54,7 +54,6 @@ def main():
         "Camera ready. leftPrimed=%s, rightPrimed=%s",
         capL.isPrimed(), capR.isPrimed()
     )
-    models = load_models(cfg["modelFile"])
     logging.info("Models loaded and cameras ready.")
 
     # queues
@@ -63,7 +62,7 @@ def main():
 
     # start tasks
     CaptureTask(capL, capR, qL, qR).start()
-    InferenceTask(models, qL, qR, results, shared_cfg, cfg_lock).start()
+    InferenceTask(cfg, qL, qR, results, shared_cfg, cfg_lock).start()
     OSCSenderTask(results, shared_cfg, cfg_lock).start()
 
     # keep main alive
