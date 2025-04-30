@@ -7,7 +7,6 @@ import threading
 from queue import Queue, Empty
 import numpy as np
 import cv2
-import tensorflow as tf
 from inference import InferenceTask
 from osc import OSCSenderTask
 from mjpeg_streamer import MJPEGVideoCapture
@@ -18,16 +17,6 @@ from capture import CaptureTask
 # ----------------------------
 # Main
 # ----------------------------
-def load_models(model_dir):
-    return {
-        "combined_theta": tf.keras.models.load_model(os.path.join(model_dir, "combined_pitchyaw.h5"), compile=False),
-        "combined_open" : tf.keras.models.load_model(os.path.join(model_dir, "combined_openness.h5"), compile=False),
-        "left_theta"    : tf.keras.models.load_model(os.path.join(model_dir, "left_pitchyaw.h5"), compile=False),
-        "left_open"     : tf.keras.models.load_model(os.path.join(model_dir, "left_openness.h5"), compile=False),
-        "right_theta"   : tf.keras.models.load_model(os.path.join(model_dir, "right_pitchyaw.h5"), compile=False),
-        "right_open"    : tf.keras.models.load_model(os.path.join(model_dir, "right_openness.h5"), compile=False),
-    }
-
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S")
     shared_cfg = {}
