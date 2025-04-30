@@ -127,10 +127,19 @@ class InferenceTask(threading.Thread):
         start_time = time.perf_counter()
         
         while True:
+            leftEyeHasImage = True
+            rightEyeHasImage = True
             try:
-                fL = self.queueL.get(timeout=1)
-                fR = self.queueR.get(timeout=1)
+                fL = self.queueL.get(timeout=0.1)
             except Empty:
+                leftEyeHasImage = False
+            try:
+                fR = self.queueR.get(timeout=0.1)
+            except Empty:
+                rightEyeHasImage = False
+                
+            if not (leftEyeHasImage or rightEyeHasImage):
+                # logging.info("No image")
                 continue
 
             lt_np = np.expand_dims(self.preprocess(fL), axis=0)

@@ -53,14 +53,13 @@ class MJPEGVideoCapture:
                 continue
 
     def read(self):
-        #with self.lock:
-        # Return whether a frame exists and its copy
         if self.frame is not None:
-            #time.sleep(self.sleep_time)
-            return True, self.frame.copy()
+            frame_copy = self.frame.copy()
+            self.frame = None  # Clear the frame after copying
+            return True, frame_copy
         else:
-            #time.sleep(self.sleep_time)
             return False, None
+
 
     def isOpened(self):
        return self.running

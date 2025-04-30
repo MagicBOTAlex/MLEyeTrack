@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from helpers import *
@@ -16,9 +17,15 @@ class CaptureTask(threading.Thread):
             okL, fL = self.capL.read()
             okR, fR = self.capR.read()
             if okL:
-                if self.queueL.full(): self.queueL.get_nowait()
+                if self.queueL.full(): 
+                    self.queueL.get_nowait()
+                    
+                # logging.info("Got left frame")
                 self.queueL.put(fL)
             if okR:
-                if self.queueR.full(): self.queueR.get_nowait()
+                if self.queueR.full(): 
+                    self.queueR.get_nowait()
+                    
+                # logging.info("Got right frame")
                 self.queueR.put(fR)
             time.sleep(0.001)
