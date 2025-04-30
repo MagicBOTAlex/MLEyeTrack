@@ -101,6 +101,7 @@ def load_models(model_dir):
             onnx_path,
             providers=providers
         )
+        print("Using: " + sess.get_providers()[0])
         sessions[key] = sess
 
     return sessions

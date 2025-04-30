@@ -3,6 +3,7 @@ import time
 from helpers import *
 from pythonosc import udp_client
 import logging
+import numpy as np
 
 # ----------------------------
 # Post-Process & OSC Sender Task
@@ -52,9 +53,16 @@ class OSCSenderTask(threading.Thread):
                     else "none")
 
             def send(key, *vals):
-                if self.prev.get(key) != tuple(vals):
-                    self.prev[key] = tuple(vals)
-                    osc.send_message(key, list(vals))
+                # Convert each value to a type python-osc understands
+                cleaned = []
+                for v in vals:
+                    if isinstance(v, np.generic):       # NumPy scalar → built-in float/int
+                        v = float(v) if v.dtype.kind == "f" else int(v)
+                    cleaned.append(v)
+
+                if self.prev.get(key) != tuple(cleaned):
+                    self.prev[key] = tuple(cleaned)
+                    osc.send_message(key, cleaned)
 
             # NATIVE
             if mode == "native":
