@@ -12,5 +12,5 @@ dependencies:
   - pip:
       - tf2onnx
       - python-osc
-      - tensorflow
+      - tensorflow-cpu
       - pyinstaller
