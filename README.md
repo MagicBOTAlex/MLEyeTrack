@@ -22,7 +22,7 @@ Change the settings of `Settings.json`, then run the .exe and we gucci.
 - Currenly licensed under Babble's restrictive license
 - Uses Python
 - .exe + python + dependencies = 3.64GB unzipped
-- No UI (In progress. Slow)
+- No UI
 
 Ryan's eyetracking uses ~13% CPU and ~23% GPU
 My version uses ~1.5% CPU and ~5% GPU
