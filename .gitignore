@@ -1,4 +1,8 @@
-__pycache__/**
+**/__pycache__/**
 
 models/*
 !models/*.h5
+
+dist
+build
+*.pyc

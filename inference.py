@@ -8,10 +8,13 @@ import subprocess
 import shutil
 from queue import Queue, Empty
 
+import tensorflow as tf
+
 import numpy as np
 import cv2
 import onnxruntime as ort
 from pythonosc import udp_client
+import tf2onnx
 from mjpeg_streamer import MJPEGVideoCapture
 from helpers import (
     transform_openness,
@@ -39,43 +42,36 @@ def get_onnx_providers():
 # --------------------------------
 # ONNX conversion helper
 # --------------------------------
-def ensure_onnx(h5_path: str, onnx_path: str, opset=13):
-    """
-    1) If .onnx is missing or older than .h5,
-       a) load .h5, save as SavedModel,
-       b) run tf2onnx on that SavedModel.
-    """
+def ensure_onnx(h5_path: str, onnx_path: str, opset: int = 13):
+    # Only convert if ONNX is missing or stale
     if (not os.path.exists(onnx_path)
         or os.path.getmtime(h5_path) > os.path.getmtime(onnx_path)):
 
         logging.info(f"Converting {os.path.basename(h5_path)} → ONNX…")
-
-        # a) Load your Keras .h5
-        import tensorflow as tf  # only here
         model = tf.keras.models.load_model(h5_path, compile=False)
 
-        # b) Dump to a temporary SavedModel folder
-        sm_dir = onnx_path + "_savedmodel"
-        if os.path.isdir(sm_dir):
-            shutil.rmtree(sm_dir)
-        tf.saved_model.save(model, sm_dir)
-        logging.info(f"  • SavedModel written to {sm_dir}")
+        # 1) Patch output_names if needed
+        if not hasattr(model, "output_names"):
+            model.output_names = [
+                tensor.name.split(":")[0]
+                for tensor in model.outputs
+            ]
 
-        # c) Call the tf2onnx CLI
-        cmd = [
-            sys.executable, "-m", "tf2onnx.convert",
-            "--saved-model", sm_dir,
-            "--output",      onnx_path,
-            "--opset",      str(opset)
+        # 2) Build an input_signature
+        input_signature = [
+            tf.TensorSpec(inp.shape, inp.dtype, name=inp.name.split(":")[0])
+            for inp in model.inputs
         ]
-        try:
-            subprocess.check_call(cmd)
-            logging.info(f"  ✓ Wrote ONNX to {onnx_path}")
-        except subprocess.CalledProcessError as e:
-            logging.error("ONNX conversion failed.")
-            logging.error(e)
-            raise
 
+        # 3) Convert in-process
+        tf2onnx.convert.from_keras(
+            model,
+            input_signature=input_signature,
+            opset=opset,
+            output_path=onnx_path
+        )
+        logging.info(f"  ✓ Wrote ONNX to {onnx_path}")
+        
 # --------------------------------
 # Load ONNX sessions
 # --------------------------------

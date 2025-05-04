@@ -30,10 +30,20 @@ def main():
             if shared_cfg:
                 break
         time.sleep(0.1)
-
-    # setup camera and models once
+        
+    # Configs
     with cfg_lock:
         cfg = dict(shared_cfg)
+
+    # queues
+    qL, qR = Queue(maxsize=1), Queue(maxsize=1)
+    results = Queue(maxsize=5)
+
+    # Setup models before cameras
+    InferenceTask(cfg, qL, qR, results, shared_cfg, cfg_lock).start()
+    logging.info("Models loaded and cameras ready.")
+
+    # setup camera
     capL = MJPEGVideoCapture(f"http://{cfg['leftEye']}"); capL.open()
     capR = MJPEGVideoCapture(f"http://{cfg['rightEye']}"); capR.open()
     logging.info("Waiting for at least one camera to become ready…")
@@ -43,15 +53,8 @@ def main():
         "Camera ready. leftPrimed=%s, rightPrimed=%s",
         capL.isPrimed(), capR.isPrimed()
     )
-    logging.info("Models loaded and cameras ready.")
-
-    # queues
-    qL, qR = Queue(maxsize=1), Queue(maxsize=1)
-    results = Queue(maxsize=5)
-
-    # start tasks
     CaptureTask(capL, capR, qL, qR).start()
-    InferenceTask(cfg, qL, qR, results, shared_cfg, cfg_lock).start()
+
     OSCSenderTask(results, shared_cfg, cfg_lock).start()
 
     # keep main alive
