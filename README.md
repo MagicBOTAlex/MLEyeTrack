@@ -1,7 +1,16 @@
 # MLEyeTrack
 Docker version: https://github.com/MagicBOTAlex/DockeredMLEyeTrack
 
-### Currently no UI, but a crude one is in development
+### Currently no UI
+Depending on number of users, I'll consider making an UI \
+If it's only me using this, then no UI is needed.
+
+### Instructions
+This is what is included in the .zip \
+![image](https://github.com/user-attachments/assets/511be61c-f02e-433e-bf90-047a95435769) \
+If you have DIY'ed eyetracking, then you definitely know how to use this software. \
+If not, then you just need to drag and drop your unconverted models (.h5) into the `models` folder. \
+Change the settings of `Settings.json`, then run the .exe and we gucci.
 
 # "Benchmarks"
 ## Pros
