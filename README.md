@@ -4,6 +4,17 @@ Docker version: https://github.com/MagicBOTAlex/DockeredMLEyeTrack
 ### Currently no UI, but a crude one is in development
 
 # "Benchmarks"
+## Pros
+- Lower latency
+- Less CPU and GPU usage
+- Not JavaScript based
+
+##
+- Currenly licensed under Babble's restrictive license
+- Uses Python
+- .exe + python + dependencies = 3.64GB unzipped
+- No UI (In progress. Slow)
+
 Ryan's eyetracking uses ~13% CPU and ~23% GPU
 My version uses ~1.5% CPU and ~5% GPU
 
