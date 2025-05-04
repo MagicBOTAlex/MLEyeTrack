@@ -10,6 +10,7 @@ This is what is included in the .zip \
 ![image](https://github.com/user-attachments/assets/511be61c-f02e-433e-bf90-047a95435769) \
 If you have DIY'ed eyetracking, then you definitely know how to use this software. \
 If not, then you just need to drag and drop your unconverted models (.h5) into the `models` folder. \
+These models are only V1 of Ryan's models. You still have to use his software to train the models. My software only provides a new engine to run the models.
 Change the settings of `Settings.json`, then run the .exe and we gucci.
 
 # "Benchmarks"
