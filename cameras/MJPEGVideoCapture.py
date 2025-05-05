@@ -4,25 +4,18 @@ import cv2
 import threading
 import time
 
-# Source: https://github.com/Project-Babble/ProjectBabble/pull/105/commits/48938d19d15c177beaa04461b28d7959e1343d53
+from cameras.ICameraSource import ICameraSource
 
-class MJPEGVideoCapture:
+# Source: https://github.com/Project-Babble/ProjectBabble/pull/105/commits/48938d19d15c177beaa04461b28d7959e1343d53
+# License is Project babble's
+
+class MJPEGVideoCapture(ICameraSource):
     def __init__(self, url):
         self.url = url
         self.session = requests.Session()
-        self.stream = None
-        self.byte_buffer = b""
-        self.frame = None
-        self.running = False
-        self.lock = threading.Lock()
-        self.thread = None
-
-    def open(self):
-        if not self.running:
-            self.running = True
-            self.thread = threading.Thread(target=self._update, daemon=True)
-            self.thread.start()
-
+        
+        super().__init__()
+    
     def _update(self):
         while self.running:
             try:
@@ -52,35 +45,7 @@ class MJPEGVideoCapture:
                 time.sleep(0.1)
                 continue
 
-    def read(self):
-        if self.frame is not None:
-            frame_copy = self.frame.copy()
-            self.frame = None  # Clear the frame after copying
-            return True, frame_copy
-        else:
-            return False, None
-
-
-    def isOpened(self):
-       return self.running
     
-    def isPrimed(self):
-        if self.frame is not None:
-            return True
-        else: return False
-
-    def release(self):
-        self.running = False
-        if self.thread is not None:
-            self.thread.join()
-        self.stream = None
-        self.frame = None
-        self.byte_buffer = b""
-        self.session.close()
-
-    def get(self, item):
-        pass
-        return 1
 
 
 if __name__ == "__main__":

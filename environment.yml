@@ -14,3 +14,4 @@ dependencies:
       - python-osc
       - tensorflow-cpu
       - pyinstaller
+      - serial

@@ -8,6 +8,9 @@ import subprocess
 import shutil
 from queue import Queue, Empty
 
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 
 import numpy as np
@@ -15,7 +18,7 @@ import cv2
 import onnxruntime as ort
 from pythonosc import udp_client
 import tf2onnx
-from MJPEGVideoCapture import MJPEGVideoCapture
+from cameras.MJPEGVideoCapture import MJPEGVideoCapture
 from helpers import (
     transform_openness,
     calculate_offset_fraction,

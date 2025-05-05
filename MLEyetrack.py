@@ -9,10 +9,10 @@ import numpy as np
 import cv2
 from inference import InferenceTask
 from osc import OSCSenderTask
-from MJPEGVideoCapture import MJPEGVideoCapture
 from helpers import *
 from config import ConfigTask
 from capture import CaptureTask
+from cameras.CameraFactory import CameraFactory
 
 # ----------------------------
 # Main
@@ -44,8 +44,12 @@ def main():
     logging.info("Models loaded and cameras ready.")
 
     # setup camera
-    capL = MJPEGVideoCapture(f"http://{cfg['leftEye']}"); capL.open()
-    capR = MJPEGVideoCapture(f"http://{cfg['rightEye']}"); capR.open()
+    # capL = MJPEGVideoCapture(f"http://{cfg['leftEye']}"); capL.open()
+    # capR = MJPEGVideoCapture(f"http://{cfg['rightEye']}"); capR.open()
+    # capL = SystemCamera(0); capL.open()
+    # capR = SystemCamera(1); capR.open()
+    capL = CameraFactory.get_camera_from_string_type(cfg['leftEye']); capL.open()
+    capR = CameraFactory.get_camera_from_string_type(cfg['rightEye']); capR.open()
     logging.info("Waiting for at least one camera to become ready…")
     while not (capL.isPrimed() or capR.isPrimed()):
         time.sleep(0.1)
