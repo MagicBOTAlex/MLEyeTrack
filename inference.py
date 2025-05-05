@@ -15,7 +15,7 @@ import cv2
 import onnxruntime as ort
 from pythonosc import udp_client
 import tf2onnx
-from mjpeg_streamer import MJPEGVideoCapture
+from MJPEGVideoCapture import MJPEGVideoCapture
 from helpers import (
     transform_openness,
     calculate_offset_fraction,
@@ -238,6 +238,6 @@ class InferenceTask(threading.Thread):
                 infer_count = 0
                 start_time  = now
 
-            with self.lock:
-                interval = self.shared.get("trackingRate", 50) / 1000.0
-            time.sleep(interval)
+            # with self.lock:
+            #     interval = self.shared.get("trackingRate", 50) / 1000.0
+            # time.sleep(interval)

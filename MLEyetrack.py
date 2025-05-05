@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 from inference import InferenceTask
 from osc import OSCSenderTask
-from mjpeg_streamer import MJPEGVideoCapture
+from MJPEGVideoCapture import MJPEGVideoCapture
 from helpers import *
 from config import ConfigTask
 from capture import CaptureTask
