@@ -121,6 +121,7 @@ class InferenceTask(threading.Thread):
         
         self.last_theta = {"tL": (0.0, 0.0), "tR": (0.0, 0.0)}
         self.last_open  = {"oL": 0.0,        "oR": 0.0}
+        self._last_inference_time = time.perf_counter()
 
     def preprocess(self, frame):
         img = cv2.resize(frame, (128, 128))
@@ -240,7 +241,13 @@ class InferenceTask(threading.Thread):
                 logging.info(f"Inference rate: {infer_count / elapsed:.2f} updates/s")
                 infer_count = 0
                 start_time  = now
-
-            # with self.lock:
-            #     interval = self.shared.get("trackingRate", 50) / 1000.0
-            # time.sleep(interval)
+                
+            # ────── 7 enforce inference-per-second limit ──────
+            limit = cfg.get("infrencePerSecondLimit", None)
+            if limit and limit > 0:
+                now = time.perf_counter()
+                desired_interval = 1.0 / float(limit)
+                elapsed = now - self._last_inference_time
+                if elapsed < desired_interval:
+                    time.sleep(desired_interval - elapsed)
+                self._last_inference_time = time.perf_counter()         

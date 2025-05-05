@@ -1,6 +1,6 @@
 {
     "leftEye": "192.168.50.238:80",
-    "rightEye": "1",
+    "rightEye": "192.168.50.200:80",
     "vrcOsc": "192.168.50.58:8889",
     "vrcNative": false,
     "modelFile": "./models",
@@ -22,5 +22,7 @@
     "horizontalExaggeration": 1,
     "oscPrefix": "ft/f/",
     "splitOutputY": true,
-    "blinkReleaseDelayMs": 25
+    "blinkReleaseDelayMs": 25,
+
+    "infrencePerSecondLimit": 60
 }
