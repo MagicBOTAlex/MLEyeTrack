@@ -8,6 +8,7 @@ dependencies:
   - requests
   - onnxruntime
   - pip
+  - colorama
 
   - pip:
       - tf2onnx
