@@ -1,45 +1,45 @@
-# -*- mode: python ; coding: utf-8 -*-
+# MLEyetrack_fast.spec
+# -*- mode: python; coding: utf-8 -*-
 
+FAST_BUILD = True # False = single .exe file
 
-a = Analysis(
-    ['MLEyetrack.py'],
-    pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=["colorama"],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    noarchive=False,
-    optimize=0,
-)
-pyz = PYZ(a.pure)
+if FAST_BUILD:
+    block_cipher = None
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='MLEyetrack',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon='./images/deprivedlogo_transparentandwhitebackground.ico'
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='MLEyetrack',
-)
+    a = Analysis(
+        ['MLEyetrack.py'],
+        pathex=['.'],           # point at your script folder
+        binaries=[],
+        datas=[],
+        hiddenimports=['colorama', 'cv2', 'tensorflow'],
+        hookspath=[],
+        runtime_hooks=[],
+        excludes=[],
+        noarchive=True,          # skip bundling pure modules into a .pyz
+        optimize=0,              # no byte-code optimization step
+    )
+    # include zipped_data even though we’re not archiving
+    pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+    exe = EXE(
+        pyz,
+        a.scripts,
+        exclude_binaries=True,
+        name='MLEyetrack',
+        debug=False,
+        strip=False,             # don’t run strip on the bootloader
+        upx=False,               # disable UPX to avoid its compression time
+        console=True,
+        icon='./images/deprivedlogo_transparentandwhitebackground.ico'
+    )
+
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,               # again, ensure no UPX on collected files
+        name='MLEyetrack',
+    )
+else:
+    pass
