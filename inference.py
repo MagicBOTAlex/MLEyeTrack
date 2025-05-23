@@ -36,6 +36,8 @@ def get_onnx_providers():
     Return a list of ONNX Runtime providers, preferring GPU if available.
     """
     available = ort.get_available_providers()
+    for _ in range(10):
+        print(available)
     if "CUDAExecutionProvider" in available:
         # You may also configure session options here (e.g. memory limits).
         return ["CUDAExecutionProvider", "CPUExecutionProvider"]

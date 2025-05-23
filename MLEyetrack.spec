@@ -7,7 +7,7 @@ from PyInstaller.utils.hooks import collect_all
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 # 1. Collect everything for these packages in one loop
-packages = ['cv2', 'tf2onnx', 'onnxruntime', 'tensorflow']
+packages = ['cv2', 'tf2onnx', 'onnxruntime', 'onnxruntime-gpu', 'tensorflow']
 datas = []
 binaries = []
 hiddenimports = []
