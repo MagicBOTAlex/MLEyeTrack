@@ -4,8 +4,8 @@ call conda activate et || exit /b
 REM Make sure PyInstaller is installed
 pip install pyinstaller || exit /b
 
-@REM del /s /q .build\*
-@REM rmdir /s /q build\
+del /s /q .\build\*
+rmdir /s /q .\build\
 
 REM Build using your .spec file
 pyinstaller MLEyetrack.spec -y || exit /b
