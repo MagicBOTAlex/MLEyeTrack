@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+print("Loading... (Exe has to decompress first. I hate python and this slowness)")
+
 import os
 import json
 import time
@@ -17,7 +19,7 @@ from cameras.CameraFactory import CameraFactory
 # ----------------------------
 # Main
 # ----------------------------
-def main():
+def main():    
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S")
     shared_cfg = {}
     cfg_lock = threading.Lock()

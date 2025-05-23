@@ -1,10 +1,6 @@
 # MLEyetrack_fast.spec
 # -*- mode: python; coding: utf-8 -*-
-
-FAST_BUILD = False  # True = directory build; False = single-file .exe
-
-from PyInstaller.utils.hooks import collect_all
-from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
+FAST_BUILD = True  # True = directory build; False = single-file .exe
 
 # 1. Collect everything for these packages in one loop
 packages = ['cv2', 'tf2onnx', 'onnxruntime', 'onnxruntime-gpu', 'tensorflow']
@@ -12,6 +8,23 @@ datas = []
 binaries = []
 hiddenimports = []
 
+from PyInstaller.utils.hooks import collect_all
+from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
+import os
+base_nvidia_path = os.path.join(os.environ.get("CONDA_PREFIX", ""), "Lib", "site-packages", "nvidia")
+subdirs = ["cudnn", "cublas", "cuda_runtime", "cufft", "nvjitlink"]
+
+for subdir in subdirs:
+    bin_path = os.path.join(base_nvidia_path, subdir, "bin")
+    if os.path.isdir(bin_path):
+        for dll in os.listdir(bin_path):
+            if dll.lower().endswith(".dll"):
+                binaries.append((os.path.join(bin_path, dll), "."))
+
+for _ in range(10):
+    print()
+print("Base nvidia:", base_nvidia_path)
+    
 for pkg in packages:
     d, b, h = collect_all(pkg)
     datas.extend(d)
@@ -19,6 +32,18 @@ for pkg in packages:
     hiddenimports.extend(h)
 
 hiddenimports += ['colorama', 'tensorflow']
+
+# How the fuck does python have this much bloat?!?!
+# print("\n")
+# print(datas)
+# print("\n")
+# print(binaries)
+# print("\n")
+# print(hiddenimports)
+# print("\n")
+
+for _ in range(10):
+    print()
 
 block_cipher = None
 

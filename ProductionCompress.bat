@@ -1,0 +1,1 @@
+7z a -tzip dist\MLEyetrack.zip .\dist\MLEyetrack\* -mx=9

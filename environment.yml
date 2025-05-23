@@ -16,3 +16,4 @@ dependencies:
     - tensorflow-cpu
     - serial
     - colorama
+    - nvidia-cudnn-cu12
