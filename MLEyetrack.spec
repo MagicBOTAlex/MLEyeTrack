@@ -1,13 +1,13 @@
 # MLEyetrack_fast.spec
 # -*- mode: python; coding: utf-8 -*-
 
-FAST_BUILD = True  # True = directory build; False = single-file .exe
+FAST_BUILD = False  # True = directory build; False = single-file .exe
 
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 # 1. Collect everything for these packages in one loop
-packages = ['cv2', 'tf2onnx', 'onnxruntime']
+packages = ['cv2', 'tf2onnx', 'onnxruntime', 'tensorflow']
 datas = []
 binaries = []
 hiddenimports = []
@@ -24,6 +24,7 @@ block_cipher = None
 
 if FAST_BUILD:
     # directory build (no onefile)
+    print("Making fast build")
     a = Analysis(
         ['MLEyetrack.py'],
         pathex=['.'],
@@ -61,6 +62,7 @@ if FAST_BUILD:
 
 else:
     # one-file build
+    print("Making singular .exe build")
     
     import PyInstaller.config
     PyInstaller.config.CONF['distpath'] = "./dist/MLEyetrack/"
@@ -83,13 +85,18 @@ else:
         pyz,
         a.scripts,
         a.binaries,
-        a.zipzed_data,
+        a.zipfiles,
         a.datas,
         name='MLEyetrack',
         debug=False,
-        strip=False,
-        upx=False,
+        bootloader_ignore_signals=False,
+        strip=True,
+        upx=True,
         console=True,
-        icon='./images/deprivedlogo_transparentandwhitebackground.ico',
-        onefile=True
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon='./images/deprivedlogo_transparentandwhitebackground.ico'
     )
