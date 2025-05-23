@@ -2,17 +2,18 @@ name: et
 channels:
   - conda-forge
 dependencies:
-  - python =3.11
-  - numpy=1.26.4
-  - opencv
-  - requests
-  - onnxruntime
+  - python=3.10
   - pip
 
   - pip:
-      - tf2onnx
-      - python-osc
-      - tensorflow-cpu
-      - pyinstaller
-      - serial
-      - colorama
+    - numpy
+    - requests
+    - pyinstaller
+    - onnxruntime
+    - onnxruntime-gpu
+    - tf2onnx
+    - opencv-python
+    - python-osc
+    - tensorflow-cpu
+    - serial
+    - colorama

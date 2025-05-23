@@ -89,6 +89,7 @@ def load_models(model_dir):
     }
     sessions = {}
     providers = get_onnx_providers()
+    print(f"Providers: {providers}")
 
     for key, fname in specs.items():
         h5_path   = os.path.join(model_dir, fname)
@@ -100,8 +101,8 @@ def load_models(model_dir):
             onnx_path,
             providers=providers
         )
-        print("Using: " + sess.get_providers()[0])
         sessions[key] = sess
+        print("Using: " + sess.get_providers()[0])
 
     return sessions
 
