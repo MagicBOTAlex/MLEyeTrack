@@ -5,7 +5,9 @@ Docker version: https://github.com/MagicBOTAlex/DockeredMLEyeTrack
 Depending on number of users, I'll consider making an UI \
 If it's only me using this, then no UI is needed.
 
-### Instructions
+### Recommendation: You should know a bit of python to use this. If you want a slightly easier non-python based, then go to [Ryan's](https://github.com/ryan9411vr/EyeTracking/) (It is JavaScript based 💀)
+
+## Instructions
 This is what is included in the .zip \
 ![image](https://github.com/user-attachments/assets/511be61c-f02e-433e-bf90-047a95435769) \
 If you have DIY'ed eyetracking, then you definitely know how to use this software. \
