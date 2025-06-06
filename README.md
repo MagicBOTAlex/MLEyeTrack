@@ -7,6 +7,10 @@ If it's only me using this, then no UI is needed.
 
 ### Recommendation: You should know a bit of python to use this. If you want a slightly easier non-python based, then go to [Ryan's](https://github.com/ryan9411vr/EyeTracking/) (It is JavaScript based 💀)
 
+# ⚠️ The .exe has not been fully tested yet, and I need testers to finish it. Currently, only the python and docker version is confirmed to work.
+Python and docker is confirmed working because I regularly use it. (If you're lucky, you'll find me at the great pug once a week) \
+Else you can find me at Ryan's discord: https://discord.gg/QTyU4eNKrv
+
 ## Instructions
 This is what is included in the .zip \
 ![image](https://github.com/user-attachments/assets/511be61c-f02e-433e-bf90-047a95435769) \
@@ -42,24 +46,30 @@ Change the settings of `Settings.json`, then run the .exe and we gucci.
 # "Benchmarks"
 ## Pros
 - Lower latency
-- Less CPU and GPU usage
 - Not JavaScript based
 
 ##
 - Currenly licensed under Babble's restrictive license
 - Uses Python
-- .exe + python + dependencies = 3.64GB unzipped
+- .exe + python + CUDA + dependencies = BIG .EXE
 - No UI
 
-Ryan's eyetracking uses ~13% CPU and ~23% GPU
-My version uses ~1.5% CPU and ~5% GPU
-
-### My version
-![image](https://github.com/user-attachments/assets/2a5a465a-223c-4a6c-b35a-6afc56bb51e3)
-
-### Ryan's vesion
-![image](https://github.com/user-attachments/assets/260255cf-2490-441d-a89e-070d3733b340)
-
+<table>
+  <tr>
+    <td>
+          <h2>MLEyeTrack (old)</h2>
+      <a href="https://github.com/user-attachments/assets/2a5a465a-223c-4a6c-b35a-6afc56bb51e3">
+        <img src="https://github.com/user-attachments/assets/2a5a465a-223c-4a6c-b35a-6afc56bb51e3" alt="MLEyeTrack cpu/gpu usage" width="300">
+      </a>
+    </td>
+    <td>
+          <h2>Ryan's eyetrack</h2>
+      <a href="https://github.com/user-attachments/assets/260255cf-2490-441d-a89e-070d3733b340">
+        <img src="https://github.com/user-attachments/assets/260255cf-2490-441d-a89e-070d3733b340" alt="Ryan's cpu/gpu usage" width="300">
+      </a>
+    </td>
+  </tr>
+</table>
 
 # Building from source
 You need conda, but then it's as easy as running `build.bat` on windows. Linux is slightly different. \
