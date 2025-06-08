@@ -49,7 +49,7 @@ Change the settings of `Settings.json`, then run the .exe and we gucci.
 - ONNX based (Less GPU/CPU per infrence)
 - Not JavaScript based
 
-##
+## Cons
 - Currenly licensed under Babble's restrictive license
 - Uses Python
 - .exe + python + CUDA + dependencies = BIG .EXE
