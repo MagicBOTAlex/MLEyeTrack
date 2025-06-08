@@ -46,6 +46,7 @@ Change the settings of `Settings.json`, then run the .exe and we gucci.
 # "Benchmarks"
 ## Pros
 - Lower latency
+- ONNX based (Less GPU/CPU per infrence)
 - Not JavaScript based
 
 ##
