@@ -34,10 +34,18 @@ Change the settings of `Settings.json`, then run the .exe and we gucci.
         <video src="https://github.com/user-attachments/assets/67c03609-f381-452a-952f-5274c6105fe9" alt="Video 2" width="300">
       </a>
     </td>
+  </tr>
+          <tr>
     <td>
           <h2>MLEyetrack (Calibrated 2 months ago)</h2>
       <a href="https://github.com/user-attachments/assets/2d0c061c-ffa8-4ea9-98f0-1c68f74040d2">
         <video src="https://github.com/user-attachments/assets/2d0c061c-ffa8-4ea9-98f0-1c68f74040d2" alt="Video 3" width="300">
+      </a>
+    </td>
+          <td>
+          <h2>Baballonia</h2>
+      <a href="https://github.com/user-attachments/assets/79df123e-9fb2-472f-a498-649868678f44">
+        <video src="https://github.com/user-attachments/assets/79df123e-9fb2-472f-a498-649868678f44" alt="Video 4" width="300">
       </a>
     </td>
   </tr>
