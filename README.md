@@ -1,24 +1,3 @@
-# MLEyeTrack
-Docker version: https://github.com/MagicBOTAlex/DockeredMLEyeTrack
-
-### Currently no UI
-Depending on number of users, I'll consider making an UI \
-If it's only me using this, then no UI is needed.
-
-### Recommendation: You should know a bit of python to use this. If you want a slightly easier non-python based, then go to [Ryan's](https://github.com/ryan9411vr/EyeTracking/) (It is JavaScript based 💀)
-
-# ⚠️ The .exe has not been fully tested yet, and I need testers to finish it. Currently, only the python and docker version is confirmed to work.
-Python and docker is confirmed working because I regularly use it. (If you're lucky, you'll find me at the great pug once a week) \
-Else you can find me at Ryan's discord: https://discord.gg/QTyU4eNKrv
-
-## Instructions
-This is what is included in the .zip \
-![image](https://github.com/user-attachments/assets/511be61c-f02e-433e-bf90-047a95435769) \
-If you have DIY'ed eyetracking, then you definitely know how to use this software. \
-If not, then you just need to drag and drop your unconverted models (.h5) into the `models` folder. \
-These models are only V1 of Ryan's models. You still have to use [Ryan's](https://github.com/ryan9411vr/EyeTracking/) software to train the models. My software only provides a new engine to run the models.
-Change the settings of `Settings.json`, then run the .exe and we gucci.
-
 # Comparison
 <table>
   <tr>
@@ -50,6 +29,27 @@ Change the settings of `Settings.json`, then run the .exe and we gucci.
     </td>
   </tr>
 </table>
+
+# MLEyeTrack
+Docker version: https://github.com/MagicBOTAlex/DockeredMLEyeTrack
+
+### Currently no UI
+Depending on number of users, I'll consider making an UI \
+If it's only me using this, then no UI is needed.
+
+### Recommendation: You should know a bit of python to use this. If you want a slightly easier non-python based, then go to [Ryan's](https://github.com/ryan9411vr/EyeTracking/) (It is JavaScript based 💀)
+
+# ⚠️ The .exe has not been fully tested yet, and I need testers to finish it. Currently, only the python and docker version is confirmed to work.
+Python and docker is confirmed working because I regularly use it. (If you're lucky, you'll find me at the great pug once a week) \
+Else you can find me at Ryan's discord: https://discord.gg/QTyU4eNKrv
+
+## Instructions
+This is what is included in the .zip \
+![image](https://github.com/user-attachments/assets/511be61c-f02e-433e-bf90-047a95435769) \
+If you have DIY'ed eyetracking, then you definitely know how to use this software. \
+If not, then you just need to drag and drop your unconverted models (.h5) into the `models` folder. \
+These models are only V1 of Ryan's models. You still have to use [Ryan's](https://github.com/ryan9411vr/EyeTracking/) software to train the models. My software only provides a new engine to run the models.
+Change the settings of `Settings.json`, then run the .exe and we gucci.
 
 # "Benchmarks"
 ## Pros
